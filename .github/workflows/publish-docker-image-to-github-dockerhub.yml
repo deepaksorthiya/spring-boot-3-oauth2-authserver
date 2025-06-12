@@ -3,6 +3,7 @@ name: Publish a Docker image to Github and DockerHub
 on:
   release:
     types: [ published ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -17,8 +18,25 @@ jobs:
       IMAGE_NAME: ${{ github.repository }}
 
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Set up GraalVM JDK 24
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '24'
+          distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check Java Version
+        run: |
+          echo "GRAALVM_HOME: $GRAALVM_HOME"
+          echo "JAVA_HOME: $JAVA_HOME"
+          java --version
+          native-image --version
+
+      - name: Clean Build Test with Maven
+        run: chmod +x mvnw && ./mvnw clean -Pnative spring-boot:build-image -DskipTests --file pom.xml --batch-mode --update-snapshots
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
@@ -33,27 +51,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            deepaksorthiya/spring-boot-3-oauth2-authserver
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      - name: Push To Dockerhub
+        run: docker push deepaksorthiya/spring-boot-3-oauth2-authserver:latest
 
-      - name: Build and push image
-        id: push
-        uses: docker/build-push-action@v6.18.0
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Attest
-        uses: actions/attest-build-provenance@v2.4.0
-        id: attest
-        with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          subject-digest: ${{ steps.push.outputs.digest }}
-          #push-to-registry: true
+      - name: Push To Github
+        run: docker tag deepaksorthiya/spring-boot-3-oauth2-authserver:latest ${{ env.REGISTRY }}/deepaksorthiya/spring-boot-3-oauth2-authserver:latest && docker push ${{ env.REGISTRY }}/deepaksorthiya/spring-boot-3-oauth2-authserver:latest

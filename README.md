@@ -9,7 +9,7 @@
 ```
 Spring Boot: 3.5.0
 Maven: 3.9+
-Java: 21
+Java: 24
 ```
 
 ### Clone this repository:
